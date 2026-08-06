@@ -37,6 +37,11 @@ fois.
 
 ### Ce qui est implémenté
 
+- **Double clic bouton du milieu, n'importe où** (`MiddleClickTap.swift`) : bascule la fenêtre
+  au premier plan / la cache. Bouton du milieu choisi précisément parce que le double clic
+  droit est déjà pris par un autre projet perso ; les deux gestes ne se marchent jamais dessus.
+  Nécessite la permission Accessibilité (Réglages Système → Confidentialité et sécurité →
+  Accessibilité).
 - **Trois sources fusionnées** (`Store.swift`) : lecture de tous les fichiers JSON du dossier,
   fusion en une liste unique, tri épinglés d'abord puis priorité/date, surveillance du dossier
   toutes les 2s pour se rafraîchir sans redémarrage.
@@ -106,6 +111,10 @@ normal double-click) to allow the one-time exception.
 
 ### What's implemented
 
+- **Double middle-click, anywhere** (`MiddleClickTap.swift`): toggles the window to the front /
+  hides it. Middle button chosen specifically because double right-click is already taken by
+  another personal project; the two gestures never step on each other. Requires Accessibility
+  permission (System Settings → Privacy & Security → Accessibility).
 - **Three sources merged** (`Store.swift`): reads every JSON file in the folder, merges into
   one list, sorted pinned-first then priority/date, watches the folder every 2s to refresh
   without a restart.
