@@ -28,6 +28,40 @@ extension ReglagesFenetre {
     }
 }
 
+// MARK: - Glissé avec retour visuel en direct
+
+/// Réordonne dès le survol (dropEntered), pas seulement au relâchement —
+/// c'est ce qui donne le ressenti "les autres lignes se décalent en direct"
+/// d'un glisser natif, plutôt qu'un dépôt silencieux (06/08/2026, v4 :
+/// la v3 déplaçait bien mais sans aucun retour visuel pendant le geste,
+/// jugé "pas mature" — à raison).
+struct LigneDropDelegate: DropDelegate {
+    let ligne: Ligne
+    let groupe: [Ligne]
+    @Binding var idGlisse: String?
+    let deplacer: (_ idSource: String, _ groupe: [Ligne], _ destination: Int) -> Void
+
+    func dropEntered(info: DropInfo) {
+        guard let source = idGlisse, source != ligne.id,
+              let depart = groupe.firstIndex(where: { $0.id == source }),
+              let arrivee = groupe.firstIndex(where: { $0.id == ligne.id })
+        else { return }
+        let destination = depart < arrivee ? arrivee + 1 : arrivee
+        withAnimation(.easeInOut(duration: 0.15)) {
+            deplacer(source, groupe, destination)
+        }
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        idGlisse = nil
+        return true
+    }
+}
+
 // MARK: - Vue principale
 
 struct ContentView: View {
@@ -36,6 +70,7 @@ struct ContentView: View {
     @State private var deplie: Set<String> = []
     @State private var idEnEdition: String?
     @State private var rechercheOuverte = false
+    @State private var idEnGlissement: String?
     @FocusState private var focusSaisie: Bool
 
     var body: some View {
@@ -95,8 +130,14 @@ struct ContentView: View {
             List {
                 if !epingles.isEmpty {
                     Section {
-                        ForEach(epingles) { ligne in ligneRow(ligne) }
-                            .onMove { store.deplacerDansGroupe(epingles, de: $0, vers: $1) }
+                        // Plus de .onMove ici (06/08/2026, v3) : le glisser
+                        // natif de la List, mélangé aux clics personnalisés
+                        // de la ligne, ne fonctionnait qu'1 fois sur 15.
+                        // Remplacé par .onDrag/.onDrop maison, posé
+                        // uniquement sur la poignée ☰ de chaque ligne — voir
+                        // LigneVue. Garder les deux en même temps créerait un
+                        // vrai conflit entre deux systèmes de glissé.
+                        ForEach(epingles) { ligne in ligneRow(ligne, groupe: epingles) }
                     } header: {
                         Text("ÉPINGLÉ")
                             .font(.system(size: 10, weight: .bold))
@@ -113,8 +154,7 @@ struct ContentView: View {
 
                 if !reste.isEmpty {
                     Section {
-                        ForEach(reste) { ligne in ligneRow(ligne) }
-                            .onMove { store.deplacerDansGroupe(reste, de: $0, vers: $1) }
+                        ForEach(reste) { ligne in ligneRow(ligne, groupe: reste) }
                     } header: {
                         if !epingles.isEmpty {
                             Text("AUTRES")
@@ -139,16 +179,25 @@ struct ContentView: View {
     }
 
     /// Une ligne de la liste — factorisé pour être appelé depuis les deux
-    /// sections (épinglés / reste) sans dupliquer les paramètres.
-    private func ligneRow(_ ligne: Ligne) -> some View {
+    /// sections (épinglés / reste) sans dupliquer les paramètres. `groupe`
+    /// sert au DropDelegate : la position de `ligne` (et de la ligne glissée)
+    /// dans son propre groupe, jamais dans la liste entière.
+    private func ligneRow(_ ligne: Ligne, groupe: [Ligne]) -> some View {
         LigneVue(ligne: ligne,
                  deplie: store.reglages.deplieParDefaut != deplie.contains(ligne.id),
                  basculer: {
                      if deplie.contains(ligne.id) { deplie.remove(ligne.id) }
                      else { deplie.insert(ligne.id) }
                  },
-                 surEdition: { idEnEdition = $0 })
+                 surEdition: { idEnEdition = $0 },
+                 idGlisse: $idEnGlissement)
         .listRowInsets(EdgeInsets(top: 3, leading: 8, bottom: 3, trailing: 8))
+        .onDrop(of: [.text], delegate: LigneDropDelegate(
+            ligne: ligne, groupe: groupe, idGlisse: $idEnGlissement,
+            deplacer: { idSource, groupe, destination in
+                guard let source = groupe.firstIndex(where: { $0.id == idSource }) else { return }
+                store.deplacerDansGroupe(groupe, de: IndexSet(integer: source), vers: destination)
+            }))
     }
 
     // MARK: Pied
@@ -223,6 +272,13 @@ struct LigneVue: View {
     /// Signale à la liste quelle ligne passe en édition (nil = plus aucune),
     /// pour qu'elle puisse la garder visible.
     let surEdition: (String?) -> Void
+    /// Flèches puis dépôt-sur-relâchement abandonnés (06/08/2026, v3 puis
+    /// v4) : Vassili voulait le ressenti d'un vrai glisser natif, avec les
+    /// autres lignes qui se décalent en direct. Ce binding partagé permet à
+    /// la poignée de signaler "c'est moi qu'on glisse" et à ContentView de
+    /// réordonner dès le survol (LigneDropDelegate.dropEntered) plutôt qu'au
+    /// relâchement seul.
+    @Binding var idGlisse: String?
     @State private var enEdition = false
     @State private var titreEdite = ""
     @State private var corpsEdite = ""
@@ -240,24 +296,17 @@ struct LigneVue: View {
                 editeur
             } else {
                 VStack(alignment: .leading, spacing: 4) {
-                    enTete
+                    // 06/08/2026, fix v2 : un vrai Button plutôt qu'un geste de
+                    // clic maison. Un .onTapGesture/.gesture personnalisé, même
+                    // limité à l'en-tête, continuait à intercepter le mouseDown
+                    // avant que la List reconnaisse un glissé (1 essai sur 15
+                    // fonctionnait). Button coexiste correctement avec le
+                    // réordonnancement natif de macOS — c'est le composant que
+                    // SwiftUI attend pour ce cas précis.
+                    Button(action: basculer) { enTete }
+                        .buttonStyle(.plain)
                     if deplie { detail }
                 }
-                .contentShape(Rectangle())
-                // Zéro latence : le simple clic bascule immédiatement, sans
-                // attendre de savoir si un double suit. Si un double arrive
-                // (simultaneousGesture), on annule la bascule du premier clic
-                // puis on fait l'action du double — édition pour une note de
-                // Vassili, ouverture de la conversation pour une fiche Claude.
-                .onTapGesture { basculer() }
-                .simultaneousGesture(TapGesture(count: 2).onEnded {
-                    basculer()   // annule la bascule déclenchée par le 1er clic
-                    if store.estAVassili(ligne) {
-                        demarrerEdition()
-                    } else if !ligne.url.isEmpty {
-                        ouvrirLien()
-                    }
-                })
             }
         }
         .padding(.vertical, 3)
@@ -298,6 +347,19 @@ struct LigneVue: View {
                                          ? Color.primary
                                          : Color(red: 0.90, green: 0.55, blue: 0.35))
                         .lineLimit(deplie ? nil : 2)
+                        // Double clic ré-attaché ici uniquement (06/08/2026,
+                        // fix v2) : zone minuscule (le texte seul), pour ne
+                        // jamais gêner le glissé natif de la List sur le
+                        // reste de la ligne. contentShape nécessaire car le
+                        // Button parent capterait sinon ce tap avant lui.
+                        .contentShape(Rectangle())
+                        .onTapGesture(count: 2) {
+                            if store.estAVassili(ligne) {
+                                demarrerEdition()
+                            } else if !ligne.url.isEmpty {
+                                ouvrirLien()
+                            }
+                        }
 
                     if !ligne.prochaineEtape.isEmpty {
                         Text(ligne.prochaineEtape)
@@ -310,6 +372,20 @@ struct LigneVue: View {
 
             Spacer(minLength: 4)
 
+            // Poignée de glissé : seule cette icône déclenche .onDrag — pas
+            // la ligne entière. C'est ce qui règle le conflit avec les autres
+            // clics (Button pour déplier, double-clic sur le titre pour
+            // éditer) : le glissé n'a plus qu'une seule petite zone dédiée à
+            // interpréter, il ne se dispute plus rien avec le reste.
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary.opacity(0.5))
+                .padding(.horizontal, 2)
+                .onDrag {
+                    idGlisse = ligne.id
+                    return NSItemProvider(object: ligne.id as NSString)
+                }
+
             Button { store.basculerEpingle(ligne) } label: {
                 Image(systemName: ligne.pin ? "pin.fill" : "pin")
                     .font(.system(size: 10))
@@ -318,6 +394,11 @@ struct LigneVue: View {
             .buttonStyle(.plain)
             .help(ligne.pin ? "Désépingler" : "Épingler")
         }
+        // Ligne d'origine estompée pendant le glissé : avec le déplacement
+        // en direct au survol (dropEntered dans ContentView), elle glisse
+        // déjà de position toute seule — l'estompage confirme visuellement
+        // laquelle est "en main", comme le ferait une List native.
+        .opacity(idGlisse == ligne.id ? 0.35 : 1)
     }
 
     /// Qui porte la ligne : silhouette pour Vassili, astérisque orange pour
