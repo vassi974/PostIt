@@ -55,6 +55,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // La fenêtre n'existe pas encore au tout premier instant : on attend
         // qu'elle soit posée avant de lui appliquer niveau, taille et position.
         DispatchQueue.main.async { [weak self] in self?.attacher() }
+
+        MiddleClickTap.shared.surDoubleClic = { [weak self] in self?.basculerVisibilite() }
+        MiddleClickTap.shared.demarrer()
+    }
+
+    /// Montre la fenêtre si elle est cachée ou en arrière-plan ; la cache si
+    /// elle est déjà au premier plan — un double clic milieu suffit dans les
+    /// deux sens, pas besoin d'un geste différent pour fermer.
+    private func basculerVisibilite() {
+        guard let w = fenetre else { return }
+        if w.isVisible && NSApp.isActive {
+            w.orderOut(nil)
+        } else {
+            NSApp.activate(ignoringOtherApps: true)
+            w.makeKeyAndOrderFront(nil)
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ s: NSApplication) -> Bool { true }
