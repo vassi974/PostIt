@@ -41,6 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var fenetre: NSWindow?
     private var observation: NSObjectProtocol?
     private var abonnement: AnyCancellable?
+    private var itemBarreMenus: NSStatusItem?
 
     /// Le bouton punaise ne fait que modifier `reglages` : sans cet abonnement,
     /// personne ne redemandait à la fenêtre de changer de niveau, et elle
@@ -56,8 +57,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // qu'elle soit posée avant de lui appliquer niveau, taille et position.
         DispatchQueue.main.async { [weak self] in self?.attacher() }
 
+        creerIconeBarreMenus()
+
         MiddleClickTap.shared.surDoubleClic = { [weak self] in self?.basculerVisibilite() }
         MiddleClickTap.shared.demarrer()
+    }
+
+    /// Icône permanente dans la barre de menus : ne demande aucune permission
+    /// spéciale, contrairement au double clic milieu qui dépend de
+    /// l'Accessibilité — donc toujours disponible même si cette dernière
+    /// n'a pas encore été accordée ou a été retirée par erreur.
+    private func creerIconeBarreMenus() {
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        if let bouton = item.button {
+            bouton.image = NSImage(systemSymbolName: "note.text",
+                                   accessibilityDescription: "Post-it")
+            bouton.action = #selector(basculerDepuisBarreMenus)
+            bouton.target = self
+        }
+        itemBarreMenus = item
+    }
+
+    @objc private func basculerDepuisBarreMenus() {
+        basculerVisibilite()
     }
 
     /// Montre la fenêtre si elle est cachée ou en arrière-plan ; la cache si
