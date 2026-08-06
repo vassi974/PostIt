@@ -91,6 +91,10 @@ struct ReglagesFenetre: Codable, Equatable {
     var taillePolice: Double = 12
     var policeNom: String = ""          // "" = police système
     var deplieParDefaut: Bool = true
+    /// Nombre max d'épinglés simultanés — pense au bandeau TURZX, dont la
+    /// place est limitée. 0 = illimité (défaut : ne gêne pas qui n'a pas
+    /// d'écran). Les possesseurs d'écran règlent selon ce qui y tient.
+    var maxEpingles: Int = 0
 
     enum CodingKeys: String, CodingKey {
         case x, y, largeur, hauteur
@@ -100,6 +104,7 @@ struct ReglagesFenetre: Codable, Equatable {
         case taillePolice = "taille_police"
         case policeNom = "police"
         case deplieParDefaut = "deplie_par_defaut"
+        case maxEpingles = "max_epingles"
     }
 }
 
@@ -197,6 +202,7 @@ extension ReglagesFenetre {
         taillePolice = try c.decodeIfPresent(Double.self, forKey: .taillePolice) ?? 12
         policeNom = try c.decodeIfPresent(String.self, forKey: .policeNom) ?? ""
         deplieParDefaut = try c.decodeIfPresent(Bool.self, forKey: .deplieParDefaut) ?? true
+        maxEpingles = try c.decodeIfPresent(Int.self, forKey: .maxEpingles) ?? 0
     }
 }
 

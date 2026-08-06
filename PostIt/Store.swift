@@ -192,9 +192,19 @@ final class Store: ObservableObject {
 
     /// Épingle ou désépingle **n'importe quelle** ligne, quelle que soit sa source.
     /// On n'écrit jamais dans le fichier d'un autre : le geste va dans l'override.
+    /// Refuse d'épingler au-delà de `maxEpingles` (0 = illimité) — la limite
+    /// ne s'applique qu'à l'ajout, jamais au retrait, qui reste toujours possible.
     func basculerEpingle(_ ligne: Ligne) {
+        let nouveauPin = !ligne.pin
+        if nouveauPin, reglages.maxEpingles > 0 {
+            let epinglesActuels = lignes.filter(\.pin).count
+            guard epinglesActuels < reglages.maxEpingles else {
+                erreur = "Limite d'épinglés atteinte (\(reglages.maxEpingles)) — désépingle avant d'en ajouter un, ou augmente la limite dans les réglages."
+                return
+            }
+        }
         affichage.pinOverrides[ligne.id] = PinOverride(
-            pin: !ligne.pin, pinMaj: Horodatage.maintenant())
+            pin: nouveauPin, pinMaj: Horodatage.maintenant())
         sauverAffichage()
     }
 

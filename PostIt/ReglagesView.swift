@@ -58,9 +58,40 @@ struct ReglagesView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            Section("Écran TURZX") {
+                Toggle("Limiter le nombre d'épinglés", isOn: Binding(
+                    get: { store.reglages.maxEpingles > 0 },
+                    set: { actif in
+                        store.reglages.maxEpingles = actif ? max(1, epinglesActuelsPourDefaut) : 0
+                        store.sauverReglages()
+                    }))
+
+                if store.reglages.maxEpingles > 0 {
+                    Stepper(value: Binding(
+                        get: { store.reglages.maxEpingles },
+                        set: { store.reglages.maxEpingles = $0; store.sauverReglages() }),
+                        in: 1...20) {
+                        Text("Maximum : \(store.reglages.maxEpingles)")
+                    }
+                }
+
+                Text("Utile si un écran externe (TURZX) n'affiche que les épinglés — sans " +
+                     "limite, illimité par défaut, ne gêne personne d'autre. Épingler " +
+                     "au-delà de la limite est refusé ; désépingler reste toujours possible.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
         .frame(width: 380)
         .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// Valeur de départ raisonnable quand on active la limite pour la
+    /// première fois : le nombre d'épinglés actuels, pour ne rien casser
+    /// tout de suite (sinon activer la limite désépinglerait tout d'un coup).
+    private var epinglesActuelsPourDefaut: Int {
+        max(1, store.lignes.filter(\.pin).count)
     }
 }
