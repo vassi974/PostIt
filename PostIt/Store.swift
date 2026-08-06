@@ -119,8 +119,15 @@ final class Store: ObservableObject {
     /// priorité puis date de mise à jour. Une ligne jamais vue arrive **en bas**
     /// de son groupe : elle ne doit pas bousculer un ordre choisi à la main.
     private func trier(_ entree: [Ligne]) -> [Ligne] {
-        let rang = Dictionary(uniqueKeysWithValues:
-            affichage.ordreManuel.enumerated().map { ($0.element, $0.offset) })
+        // uniquingKeysWith garde la première occurrence plutôt que de planter :
+        // Dictionary(uniqueKeysWithValues:) crashait tout au lancement si
+        // ordreManuel contenait un doublon (bug vécu le 06/08/2026, crash-loop
+        // total — l'app plantait avant même d'afficher une fenêtre). Ici,
+        // même un fichier corrompu reste lisible ; le nettoyage se fait à
+        // l'écriture (voir deplacerDansGroupe).
+        let rang = Dictionary(
+            affichage.ordreManuel.enumerated().map { ($0.element, $0.offset) },
+            uniquingKeysWith: { premier, _ in premier })
 
         func avant(_ a: Ligne, _ b: Ligne) -> Bool {
             if a.pin != b.pin { return a.pin }
@@ -304,7 +311,15 @@ final class Store: ObservableObject {
         let epinglesFinal = reordonne.first?.pin == true ? reordonne : autres.filter(\.pin) + reordonne
         let resteFinal = reordonne.first?.pin == true ? autres.filter { !$0.pin } : reordonne
 
-        affichage.ordreManuel = (epinglesFinal + resteFinal).map(\.id)
+        // Filet de sécurité (06/08/2026, suite crash-loop) : si `groupe` était
+        // décalé par rapport à `lignes` (deux glissés rapprochés), un id peut
+        // se retrouver des deux côtés. Un doublon dans ordreManuel faisait
+        // planter l'app AU LANCEMENT (Dictionary(uniqueKeysWithValues:) dans
+        // trier()) — jamais rien écrire sans dédupliquer d'abord.
+        var vus = Set<String>()
+        let ordreDedupe = (epinglesFinal + resteFinal).map(\.id).filter { vus.insert($0).inserted }
+
+        affichage.ordreManuel = ordreDedupe
         sauverAffichage()
     }
 
