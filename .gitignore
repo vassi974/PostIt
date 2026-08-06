@@ -7,5 +7,9 @@ xcuserdata/
 *.dSYM
 *.dSYM.zip
 
+# Packaging (le .dmg vit dans les Releases GitHub, pas dans l'historique git)
+Packaging/build/
+Packaging/*.dmg
+
 # macOS
 .DS_Store
