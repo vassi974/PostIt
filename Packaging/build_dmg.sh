@@ -14,8 +14,8 @@ if [ ! -d "$APP" ]; then
   exit 1
 fi
 
-echo "== Signature ad-hoc =="
-codesign --force --deep --sign - "$APP"
+echo "== Signature (identité stable — préserve les permissions Accessibilité) =="
+codesign --force --deep --sign "TurzxDeck Local Dev" "$APP"
 
 echo "== Assemblage du .dmg =="
 STAGING=$(mktemp -d)

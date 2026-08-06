@@ -25,7 +25,6 @@ final class MiddleClickTap {
 
     private init() {}
 
-
     /// Démarre l'écoute globale. Sans permission Accessibilité, `tapCreate`
     /// échoue silencieusement — on prévient plutôt que de laisser l'app
     /// paraître cassée sans explication.
