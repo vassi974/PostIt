@@ -100,10 +100,32 @@ final class Store: ObservableObject {
             }
         }
 
-        // 2. Retirées : masquage explicite (lignes Claude) et corbeille (notes)
+        // 2. Nouveaux épinglés sans position manuelle (08/08/2026) : le tri
+        //    ci-dessous privilégie l'ordre manuel (ordreManuel) sur la date —
+        //    un id absent de cet ordre perd TOUJOURS face à un id qui y
+        //    figure, même bien plus ancien. Après une soirée de glissés, la
+        //    quasi-totalité des épinglés a une position manuelle ; toute
+        //    nouvelle note (tapée dans l'app OU importée depuis le
+        //    téléphone, qui n'écrit jamais dans affichage.json) restait donc
+        //    coincée en bas malgré `pin = true` — contredisant la règle
+        //    "une note épinglée remonte en tête". On les insère ici, une
+        //    fois, en tête de l'ordre manuel, triées par fraîcheur entre
+        //    elles s'il y en a plusieurs d'un coup.
+        let idsConnus = Set(affichage.ordreManuel)
+        let nouveaux = toutes.filter { $0.pin && !idsConnus.contains($0.id) }
+        if !nouveaux.isEmpty {
+            let idsTries = nouveaux.sorted {
+                (Horodatage.date($0.maj) ?? .distantPast) > (Horodatage.date($1.maj) ?? .distantPast)
+            }.map(\.id)
+            affichage.ordreManuel = idsTries + affichage.ordreManuel
+            affichage.maj = Horodatage.maintenant()
+            ecrire(affichage, vers: Self.fichierAffichage)  // pas sauverAffichage() : éviterait la récursion sur recomposer()
+        }
+
+        // 3. Retirées : masquage explicite (lignes Claude) et corbeille (notes)
         toutes.removeAll { affichage.masques.contains($0.id) || $0.corbeille }
 
-        // 3. Filtres de confort (les lignes épinglées passent outre : si c'est
+        // 4. Filtres de confort (les lignes épinglées passent outre : si c'est
         //    épinglé, c'est que quelqu'un veut le voir).
         toutes.removeAll { l in
             guard !l.pin else { return false }
@@ -117,7 +139,10 @@ final class Store: ObservableObject {
 
     /// Épinglés d'abord. Dans chaque groupe : l'ordre manuel s'il existe, sinon
     /// priorité puis date de mise à jour. Une ligne jamais vue arrive **en bas**
-    /// de son groupe : elle ne doit pas bousculer un ordre choisi à la main.
+    /// de son groupe pour le RESTE ("à suivre") — mais toute nouvelle ligne
+    /// ÉPINGLÉE reçoit désormais une position en tête via recomposer() ci-
+    /// dessus, donc ce cas "en bas" ne s'applique plus qu'aux épinglés déjà
+    /// traités par cette insertion (jamais vus deux fois).
     private func trier(_ entree: [Ligne]) -> [Ligne] {
         // uniquingKeysWith garde la première occurrence plutôt que de planter :
         // Dictionary(uniqueKeysWithValues:) crashait tout au lancement si
