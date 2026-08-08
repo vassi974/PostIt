@@ -156,13 +156,20 @@ struct ContentView: View {
                     Section {
                         ForEach(reste) { ligne in ligneRow(ligne, groupe: reste) }
                     } header: {
-                        if !epingles.isEmpty {
-                            Text("AUTRES")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(.tertiary)
-                                .padding(.leading, 2)
-                        }
+                        Text("À SUIVRE")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(.leading, 2)
                     }
+                    // Deuxième boîte, symétrique à celle des épinglés mais en
+                    // teinte neutre (06/08/2026) : Vassili voulait deux
+                    // blocs visuellement francs, pas un bloc + une liste nue.
+                    .listRowBackground(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.secondary.opacity(0.08))
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                    )
                 }
             }
             .listStyle(.plain)
@@ -317,9 +324,9 @@ struct LigneVue: View {
             Button(ligne.statut == .dormant ? "Réveiller" : "Mettre en sommeil") {
                 store.basculerSommeil(ligne)
             }
-            if !ligne.url.isEmpty {
-                Button("Ouvrir la conversation") { ouvrirLien() }
-            }
+            // Liens de conversation masqués (06/08/2026) : jugés peu fiables
+            // par Vassili. Donnée `url` conservée intacte dans les fichiers,
+            // seule l'interface est désactivée — facile à réactiver plus tard.
             Divider()
             Button(store.estAVassili(ligne) ? "Supprimer" : "Retirer de la liste",
                    role: .destructive) {
@@ -354,10 +361,10 @@ struct LigneVue: View {
                         // Button parent capterait sinon ce tap avant lui.
                         .contentShape(Rectangle())
                         .onTapGesture(count: 2) {
+                            // Ouverture de lien désactivée (06/08/2026) —
+                            // seule l'édition des notes perso reste active.
                             if store.estAVassili(ligne) {
                                 demarrerEdition()
-                            } else if !ligne.url.isEmpty {
-                                ouvrirLien()
                             }
                         }
 
@@ -498,13 +505,7 @@ struct LigneVue: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            if !ligne.url.isEmpty {
-                Button(action: ouvrirLien) {
-                    Label("Ouvrir la conversation", systemImage: "arrow.up.forward.square")
-                        .font(.system(size: 10))
-                }
-                .buttonStyle(.link)
-            }
+            // Lien de conversation masqué (06/08/2026) : voir plus haut.
         }
         .padding(.leading, 14)
         .padding(.top, 1)

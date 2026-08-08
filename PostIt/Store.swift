@@ -272,6 +272,12 @@ final class Store: ObservableObject {
         ligne.maj = Horodatage.maintenant()
         ligne.pinMaj = ligne.maj
         ligne.priorite = 1
+        // Épinglée d'office (06/08/2026) : une tâche qu'on vient de noter est
+        // par définition ce à quoi on pense là, maintenant — elle doit
+        // remonter en tête sans geste supplémentaire. Le tri (priorité puis
+        // date la plus récente) la place naturellement en première position
+        // parmi les épinglés grâce à `maj` fraîchement posé ci-dessus.
+        ligne.pin = true
         sources["vassili.json", default: []].append(ligne)
         sauverVassili()
     }
